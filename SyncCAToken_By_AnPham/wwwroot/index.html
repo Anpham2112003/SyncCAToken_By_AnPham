@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SyncCAToken - Trình ký số USB Token Adapter</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --surface-hover: #334155;
+            --border: #334155;
+            --primary: #38bdf8;
+            --primary-hover: #0284c7;
+            --accent: #10b981;
+            --danger: #ef4444;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --card-radius: 12px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding: 32px 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 28px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .logo-area h1 {
+            font-size: 24px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #fff;
+        }
+
+        .badge-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 500;
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--accent);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            background-color: currentColor;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        @media (max-width: 840px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background-color: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--card-radius);
+            padding: 24px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+        }
+
+        .card h2 {
+            font-size: 17px;
+            font-weight: 600;
+            margin-bottom: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .btn {
+            background-color: var(--primary);
+            color: #0f172a;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            background-color: var(--primary-hover);
+            color: #fff;
+        }
+
+        .btn-secondary {
+            background-color: var(--surface-hover);
+            color: var(--text-main);
+        }
+
+        .btn-secondary:hover {
+            background-color: #475569;
+        }
+
+        .cert-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-height: 480px;
+            overflow-y: auto;
+            margin-top: 12px;
+            padding-right: 4px;
+        }
+
+        .cert-item {
+            background-color: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 14px;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        .cert-item:hover, .cert-item.active {
+            border-color: var(--primary);
+            background-color: rgba(56, 189, 248, 0.05);
+        }
+
+        .cert-item.active {
+            box-shadow: inset 0 0 0 1px var(--primary);
+        }
+
+        .cert-title {
+            font-weight: 600;
+            font-size: 14px;
+            color: #fff;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .cert-sub {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 2px;
+        }
+
+        .badge-pill {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: #0284c7;
+            color: #fff;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+
+        input[type="text"], textarea, select {
+            width: 100%;
+            background-color: #0f172a;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: #fff;
+            padding: 10px 14px;
+            font-family: inherit;
+            font-size: 14px;
+        }
+
+        textarea {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            resize: vertical;
+        }
+
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .result-box {
+            margin-top: 16px;
+            padding: 14px;
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            word-break: break-all;
+            display: none;
+        }
+
+        .result-box.success {
+            display: block;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #34d399;
+        }
+
+        .result-box.error {
+            display: block;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #f87171;
+        }
+
+        .tag-info {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo-area">
+                <h1>🔐 SyncCAToken Adapter</h1>
+                <p class="tag-info">Local API Adapter kết nối USB Token & Ký số cho Web Application</p>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <a href="/swagger" target="_blank" class="btn btn-secondary" style="text-decoration: none; font-size: 13px; padding: 6px 14px;">
+                    📘 Swagger UI
+                </a>
+                <div id="adapterStatus" class="badge-status">
+                    <span class="dot"></span> Đang kết nối...
+                </div>
+            </div>
+        </header>
+
+        <div class="grid">
+            <!-- Cột 1: Danh sách chứng thư số từ USB Token -->
+            <div class="card">
+                <h2>
+                    <span>Danh sách Chữ ký số (USB Token)</span>
+                    <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px;" onclick="loadCertificates()">🔄 Quét lại</button>
+                </h2>
+                <div id="certContainer" class="cert-list">
+                    <p style="color: var(--text-muted); font-size: 13px;">Đang tải danh sách chữ ký số...</p>
+                </div>
+            </div>
+
+            <!-- Cột 2: Thử nghiệm ký số -->
+            <div class="card">
+                <h2>Thực nghiệm Ký số USB Token</h2>
+                
+                <div class="form-group">
+                    <label>Thumbprint chứng thư đã chọn:</label>
+                    <input type="text" id="selectedThumbprint" placeholder="Chọn một chứng thư số ở danh sách bên trái" readonly>
+                </div>
+
+                <div class="form-group">
+                    <label>Loại ký thử nghiệm:</label>
+                    <select id="signType" onchange="toggleSignInput()">
+                        <option value="data">Ký Dữ liệu thô (Text / Payload)</option>
+                        <option value="hash">Ký trực tiếp chuỗi băm (SHA-256 Hash Base64)</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="dataInputGroup">
+                    <label>Nội dung cần ký (Text):</label>
+                    <textarea id="dataToSign" rows="3">Hóa đơn điện tử số 000123 - Tổng tiền: 15.000.000 VNĐ</textarea>
+                </div>
+
+                <div class="form-group" id="hashInputGroup" style="display: none;">
+                    <label>Hash Base64 (SHA-256 - 32 bytes):</label>
+                    <input type="text" id="hashToSign" placeholder="Ví dụ: uW8v5h4Hk9..." value="47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=">
+                </div>
+
+                <button class="btn" style="width: 100%; justify-content: center;" onclick="executeSign()">
+                    🖊️ Tiến hành Ký số (Kích hoạt PIN USB Token)
+                </button>
+
+                <div id="signResult" class="result-box"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentCertificates = [];
+
+        async function checkStatus() {
+            try {
+                const res = await fetch('/api/token/status');
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById('adapterStatus').innerHTML = `
+                        <span class="dot"></span> Adapter Sẵn sàng (${data.data.hardwareTokensCount} Token / ${data.data.activeCertificatesCount} Certs)
+                    `;
+                }
+            } catch (err) {
+                document.getElementById('adapterStatus').innerHTML = `<span style="color:#ef4444">❌ Không kết nối được Adapter</span>`;
+            }
+        }
+
+        async function loadCertificates() {
+            const container = document.getElementById('certContainer');
+            container.innerHTML = '<p style="color: var(--text-muted); font-size: 13px;">Đang quét Windows Certificate Store...</p>';
+
+            try {
+                const res = await fetch('/api/certificates?validOnly=false');
+                const result = await res.json();
+
+                if (!result.success || !result.data || result.data.length === 0) {
+                    container.innerHTML = `
+                        <div style="padding: 16px; text-align: center; color: var(--text-muted);">
+                            <p>⚠️ Không tìm thấy chứng thư số nào có Private Key.</p>
+                            <p style="font-size: 12px; margin-top: 6px;">Vui lòng kiểm tra USB Token đã cắm và đã cài driver vendor (Viettel, VNPT, BKAV...).</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                currentCertificates = result.data;
+                container.innerHTML = '';
+
+                result.data.forEach((cert, idx) => {
+                    const item = document.createElement('div');
+                    item.className = 'cert-item' + (idx === 0 ? ' active' : '');
+                    item.onclick = () => selectCert(cert.thumbprint);
+
+                    const statusPill = cert.isValid 
+                        ? '<span class="badge-pill" style="background:#10b981;">Hợp lệ</span>'
+                        : '<span class="badge-pill" style="background:#ef4444;">Hết hạn</span>';
+                    
+                    const tokenPill = cert.isHardwareToken 
+                        ? '<span class="badge-pill" style="background:#0284c7; margin-left:4px;">USB Token</span>' 
+                        : '';
+
+                    item.innerHTML = `
+                        <div class="cert-title">
+                            <span>${escapeHtml(cert.commonName || cert.subject)}</span>
+                            <div>${statusPill}${tokenPill}</div>
+                        </div>
+                        <div class="cert-sub">🏢 ${escapeHtml(cert.organization || 'Cá nhân / Tổ chức')} ${cert.taxCode ? `(MST: ${escapeHtml(cert.taxCode)})` : ''}</div>
+                        <div class="cert-sub">🏛️ Nhà cung cấp: ${escapeHtml(cert.issuerName)}</div>
+                        <div class="cert-sub">📅 Hạn: ${new Date(cert.validTo).toLocaleDateString('vi-VN')}</div>
+                        <div class="cert-sub" style="font-family: monospace; font-size: 11px;">Key: ${cert.thumbprint}</div>
+                    `;
+                    container.appendChild(item);
+                });
+
+                if (result.data.length > 0) {
+                    selectCert(result.data[0].thumbprint);
+                }
+            } catch (err) {
+                container.innerHTML = `<p style="color: #ef4444;">Lỗi khi tải chứng thư: ${err.message}</p>`;
+            }
+        }
+
+        function selectCert(thumbprint) {
+            document.getElementById('selectedThumbprint').value = thumbprint;
+            document.querySelectorAll('.cert-item').forEach(el => {
+                if (el.innerHTML.includes(thumbprint)) {
+                    el.classList.add('active');
+                } else {
+                    el.classList.remove('active');
+                }
+            });
+        }
+
+        function toggleSignInput() {
+            const type = document.getElementById('signType').value;
+            document.getElementById('dataInputGroup').style.display = type === 'data' ? 'block' : 'none';
+            document.getElementById('hashInputGroup').style.display = type === 'hash' ? 'block' : 'none';
+        }
+
+        async function executeSign() {
+            const thumbprint = document.getElementById('selectedThumbprint').value.trim();
+            const signType = document.getElementById('signType').value;
+            const resultBox = document.getElementById('signResult');
+
+            if (!thumbprint) {
+                alert('Vui lòng chọn một chứng thư số trước khi ký.');
+                return;
+            }
+
+            resultBox.className = 'result-box';
+            resultBox.style.display = 'block';
+            resultBox.innerHTML = '⏳ Đang gọi thiết bị USB Token... Nếu có hộp thoại nhập PIN, hãy nhập mã PIN trên màn hình desktop.';
+
+            try {
+                let endpoint = '';
+                let payload = {};
+
+                if (signType === 'data') {
+                    endpoint = '/api/sign/data';
+                    const text = document.getElementById('dataToSign').value;
+                    const encoder = new TextEncoder();
+                    const bytes = encoder.encode(text);
+                    const base64Data = btoa(String.fromCharCode(...bytes));
+                    payload = {
+                        thumbprint: thumbprint,
+                        dataBase64: base64Data,
+                        hashAlgorithm: 'SHA256'
+                    };
+                } else {
+                    endpoint = '/api/sign/hash';
+                    payload = {
+                        thumbprint: thumbprint,
+                        hashBase64: document.getElementById('hashToSign').value.trim(),
+                        hashAlgorithm: 'SHA256'
+                    };
+                }
+
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await res.json();
+                if (data.success && data.data && data.data.success) {
+                    resultBox.className = 'result-box success';
+                    resultBox.innerHTML = `
+                        <b>✅ Ký số thành công!</b><br>
+                        <b>Người ký:</b> ${escapeHtml(data.data.signerSubject)}<br>
+                        <b>Thuật toán:</b> ${data.data.algorithm}<br>
+                        <b>Thời gian:</b> ${data.data.signedAt}<br><br>
+                        <b>Chữ ký số (Base64 Signature):</b><br>
+                        <div style="max-height: 120px; overflow-y: auto; background: #0f172a; padding: 8px; border-radius: 4px; margin-top: 4px;">
+                            ${data.data.signatureBase64}
+                        </div>
+                    `;
+                } else {
+                    resultBox.className = 'result-box error';
+                    resultBox.innerHTML = `<b>❌ Ký số thất bại:</b> ${escapeHtml(data.message || data.data?.error || 'Lỗi không xác định')}`;
+                }
+            } catch (err) {
+                resultBox.className = 'result-box error';
+                resultBox.innerHTML = `<b>❌ Lỗi kết nối:</b> ${escapeHtml(err.message)}`;
+            }
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>'"]/g, tag => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                "'": '&#39;',
+                '"': '&quot;'
+            }[tag] || tag));
+        }
+
+        // Tự động nạp khi trang mở
+        checkStatus();
+        loadCertificates();
+    </script>
+</body>
+</html>
