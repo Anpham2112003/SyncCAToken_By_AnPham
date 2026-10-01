@@ -1,3 +1,6 @@
 <Solution>
+  <Project Path="SyncCATokenBy_AnPham/SyncCATokenBy_AnPham.vdproj" Type="Installer">
+    <Build />
+  </Project>
   <Project Path="SyncCAToken_By_AnPham/SyncCAToken_By_AnPham.csproj" />
 </Solution>
