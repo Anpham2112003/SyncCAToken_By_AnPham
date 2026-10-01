@@ -19,6 +19,19 @@ if (!isNewInstance)
 // 2. Khởi tạo Kestrel Web API
 var builder = WebApplication.CreateBuilder(args);
 
+
+// CHỈ listen HTTPS localhost:7054
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.ListenLocalhost(7054, listenOptions =>
+    {
+        listenOptions.UseHttps(
+            Path.Combine(AppContext.BaseDirectory, "localhost.pfx"),
+            "SyncCA@123456"
+        );
+    });
+});
+
 // Cấu hình CORS để web frontend gọi được Local API
 builder.Services.AddCors(options =>
 {
