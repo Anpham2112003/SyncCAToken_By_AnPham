@@ -171,14 +171,14 @@ public class CertificateService : ICertificateService
                 if (rsaCsp.CspKeyContainerInfo.HardwareDevice)
                     return true;
 
-                string provName = rsaCsp.CspKeyContainerInfo.ProviderName.ToUpperInvariant();
-                if (provName.Contains("SMART CARD") || provName.Contains("TOKEN") || provName.Contains("CSP"))
+                string? provName = rsaCsp.CspKeyContainerInfo.ProviderName?.ToUpperInvariant();
+                if (provName != null && (provName.Contains("SMART CARD") || provName.Contains("TOKEN") || provName.Contains("CSP")))
                     return true;
             }
             else if (rsa is RSACng rsaCng)
             {
-                string provider = rsaCng.Key.Provider.Provider.ToUpperInvariant();
-                if (provider.Contains("SMART CARD") || provider.Contains("TOKEN"))
+                string? provider = rsaCng.Key.Provider?.Provider?.ToUpperInvariant();
+                if (provider != null && (provider.Contains("SMART CARD") || provider.Contains("TOKEN")))
                     return true;
             }
         }

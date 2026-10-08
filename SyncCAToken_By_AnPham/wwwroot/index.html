@@ -258,6 +258,61 @@
             color: var(--text-muted);
             margin-top: 4px;
         }
+
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 10px;
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tab-btn:hover {
+            border-color: var(--primary);
+            color: var(--text-main);
+        }
+
+        .tab-btn.active {
+            background: var(--primary);
+            color: #0f172a;
+            font-weight: 600;
+            border-color: var(--primary);
+        }
+
+        .quick-actions {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+
+        .quick-btn {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px dashed var(--border);
+            color: var(--text-muted);
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .quick-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
     </style>
 </head>
 <body>
@@ -292,35 +347,70 @@
             <!-- Cột 2: Thử nghiệm ký số -->
             <div class="card">
                 <h2>Thực nghiệm Ký số USB Token</h2>
+
+                <div class="tabs">
+                    <button type="button" class="tab-btn active" id="tabSingleBtn" onclick="switchSignTab('single')">Ký Đơn Lẻ</button>
+                    <button type="button" class="tab-btn" id="tabBatchBtn" onclick="switchSignTab('batch')">Ký Hàng Loạt (All-or-Nothing)</button>
+                </div>
                 
                 <div class="form-group">
                     <label>Thumbprint chứng thư đã chọn:</label>
                     <input type="text" id="selectedThumbprint" placeholder="Chọn một chứng thư số ở danh sách bên trái" readonly>
                 </div>
 
-                <div class="form-group">
-                    <label>Loại ký thử nghiệm:</label>
-                    <select id="signType" onchange="toggleSignInput()">
-                        <option value="data">Ký Dữ liệu thô (Text / Payload)</option>
-                        <option value="hash">Ký trực tiếp chuỗi băm (SHA-256 Hash Base64)</option>
-                    </select>
+                <!-- Tab 1: Ký Đơn Lẻ -->
+                <div id="singleSignSection">
+                    <div class="form-group">
+                        <label>Loại ký thử nghiệm:</label>
+                        <select id="signType" onchange="toggleSignInput()">
+                            <option value="data">Ký Dữ liệu thô (Text / Payload)</option>
+                            <option value="hash">Ký trực tiếp chuỗi băm (SHA-256 Hash Base64)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" id="dataInputGroup">
+                        <label>Nội dung cần ký (Text):</label>
+                        <textarea id="dataToSign" rows="3">Hóa đơn điện tử số 000123 - Tổng tiền: 15.000.000 VNĐ</textarea>
+                    </div>
+
+                    <div class="form-group" id="hashInputGroup" style="display: none;">
+                        <label>Hash Base64 (SHA-256 - 32 bytes):</label>
+                        <input type="text" id="hashToSign" placeholder="Ví dụ: uW8v5h4Hk9..." value="47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=">
+                    </div>
+
+                    <button class="btn" style="width: 100%; justify-content: center;" onclick="executeSign()">
+                        🖊️ Ký Đơn Lẻ (Kích hoạt PIN USB Token)
+                    </button>
+
+                    <div id="signResult" class="result-box"></div>
                 </div>
 
-                <div class="form-group" id="dataInputGroup">
-                    <label>Nội dung cần ký (Text):</label>
-                    <textarea id="dataToSign" rows="3">Hóa đơn điện tử số 000123 - Tổng tiền: 15.000.000 VNĐ</textarea>
+                <!-- Tab 2: Ký Hàng Loạt (All-or-Nothing) -->
+                <div id="batchSignSection" style="display: none;">
+                    <div class="form-group">
+                        <label>Loại ký mẻ:</label>
+                        <select id="batchSignType" onchange="loadDefaultBatchSample()">
+                            <option value="batch-hash">Ký mẻ Hash Base64 (POST /api/sign/batch-hash)</option>
+                            <option value="batch-data">Ký mẻ Dữ liệu thô (POST /api/sign/batch-data)</option>
+                        </select>
+                    </div>
+
+                    <div class="quick-actions">
+                        <button type="button" class="quick-btn" onclick="generateSampleBatch(true)">⚡ Tạo 3 item hợp lệ</button>
+                        <button type="button" class="quick-btn" onclick="generateSampleBatch(false)">⚠️ Tạo 3 item (có 1 item lỗi để test Rollback)</button>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Danh sách tài liệu JSON (Items):</label>
+                        <textarea id="batchItemsJson" rows="6"></textarea>
+                    </div>
+
+                    <button class="btn" style="width: 100%; justify-content: center; background: #10b981;" onclick="executeBatchSign()">
+                        ⚡ Ký Batch Nguyên Tử (Chỉ nhập PIN 1 lần)
+                    </button>
+
+                    <div id="batchSignResult" class="result-box"></div>
                 </div>
-
-                <div class="form-group" id="hashInputGroup" style="display: none;">
-                    <label>Hash Base64 (SHA-256 - 32 bytes):</label>
-                    <input type="text" id="hashToSign" placeholder="Ví dụ: uW8v5h4Hk9..." value="47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=">
-                </div>
-
-                <button class="btn" style="width: 100%; justify-content: center;" onclick="executeSign()">
-                    🖊️ Tiến hành Ký số (Kích hoạt PIN USB Token)
-                </button>
-
-                <div id="signResult" class="result-box"></div>
             </div>
         </div>
     </div>
@@ -490,6 +580,147 @@
                 "'": '&#39;',
                 '"': '&quot;'
             }[tag] || tag));
+        }
+
+        function switchSignTab(tab) {
+            const tabSingleBtn = document.getElementById('tabSingleBtn');
+            const tabBatchBtn = document.getElementById('tabBatchBtn');
+            const singleSection = document.getElementById('singleSignSection');
+            const batchSection = document.getElementById('batchSignSection');
+
+            if (tab === 'single') {
+                tabSingleBtn.classList.add('active');
+                tabBatchBtn.classList.remove('active');
+                singleSection.style.display = 'block';
+                batchSection.style.display = 'none';
+            } else {
+                tabBatchBtn.classList.add('active');
+                tabSingleBtn.classList.remove('active');
+                singleSection.style.display = 'none';
+                batchSection.style.display = 'block';
+
+                if (!document.getElementById('batchItemsJson').value.trim()) {
+                    loadDefaultBatchSample();
+                }
+            }
+        }
+
+        function loadDefaultBatchSample() {
+            generateSampleBatch(true);
+        }
+
+        function generateSampleBatch(isValid) {
+            const batchType = document.getElementById('batchSignType').value;
+            const textarea = document.getElementById('batchItemsJson');
+
+            if (batchType === 'batch-hash') {
+                const sampleHashes = [
+                    { id: 'INV-2026-001', hashBase64: '47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=' },
+                    { 
+                        id: 'INV-2026-002', 
+                        hashBase64: isValid 
+                            ? 'WZRHGrsBESr8wYFZ9sx0tPURuZgG2lmzyvWpwXPKz8U=' 
+                            : 'INVALID_HASH_LENGTH_FOR_TEST' 
+                    },
+                    { id: 'INV-2026-003', hashBase64: 'm3Nvhf57qV51tBdfD8yS9fQJ0gTffc0e0r3p7a92XhY=' }
+                ];
+                textarea.value = JSON.stringify(sampleHashes, null, 2);
+            } else {
+                const sampleData = [
+                    { id: 'DOC-001', dataBase64: btoa(unescape(encodeURIComponent('Hóa đơn số 001 - Công ty ABC - 15.000.000 VNĐ'))) },
+                    { 
+                        id: 'DOC-002', 
+                        dataBase64: isValid 
+                            ? btoa(unescape(encodeURIComponent('Phiếu xét nghiệm máu 002 - Bệnh nhân Nguyễn Văn A'))) 
+                            : '!!!_NOT_VALID_BASE64_STRING_!!!' 
+                    },
+                    { id: 'DOC-003', dataBase64: btoa(unescape(encodeURIComponent('Hợp đồng dịch vụ số 003 - Khách hàng XYZ'))) }
+                ];
+                textarea.value = JSON.stringify(sampleData, null, 2);
+            }
+        }
+
+        async function executeBatchSign() {
+            const thumbprint = document.getElementById('selectedThumbprint').value.trim();
+            const batchType = document.getElementById('batchSignType').value;
+            const itemsText = document.getElementById('batchItemsJson').value.trim();
+            const resultBox = document.getElementById('batchSignResult');
+
+            if (!thumbprint) {
+                alert('Vui lòng chọn một chứng thư số trước khi ký.');
+                return;
+            }
+
+            if (!itemsText) {
+                alert('Vui lòng nhập danh sách items cần ký dạng JSON.');
+                return;
+            }
+
+            let items;
+            try {
+                items = JSON.parse(itemsText);
+                if (!Array.isArray(items) || items.length === 0) {
+                    throw new Error('Dữ liệu JSON phải là một mảng (Array) có ít nhất 1 phần tử.');
+                }
+            } catch (err) {
+                alert('Lỗi định dạng JSON items: ' + err.message);
+                return;
+            }
+
+            resultBox.className = 'result-box';
+            resultBox.style.display = 'block';
+            resultBox.innerHTML = `⏳ Đang gửi mẻ ${items.length} tài liệu... Nếu Token yêu cầu PIN, hãy nhập mã PIN (chỉ cần nhập 1 lần duy nhất).`;
+
+            try {
+                const endpoint = batchType === 'batch-hash' ? '/api/sign/batch-hash' : '/api/sign/batch-data';
+                const payload = {
+                    thumbprint: thumbprint,
+                    hashAlgorithm: 'SHA256',
+                    items: items
+                };
+
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await res.json();
+                if (data.success && data.data) {
+                    const batchData = data.data;
+                    let listHtml = batchData.signatures.map((sig, i) => `
+                        <div style="background: rgba(15, 23, 42, 0.8); padding: 8px 10px; border-radius: 6px; margin-bottom: 6px; border: 1px solid var(--border);">
+                            <div style="color: #38bdf8; font-weight: 600;">#${i + 1}. [${escapeHtml(sig.id)}]</div>
+                            <div style="font-size: 11px; color: var(--text-muted); word-break: break-all; margin-top: 2px;">
+                                ${sig.signatureBase64}
+                            </div>
+                        </div>
+                    `).join('');
+
+                    resultBox.className = 'result-box success';
+                    resultBox.innerHTML = `
+                        <b>✅ KÝ BATCH NGUYÊN TỬ THÀNH CÔNG (100%)</b><br>
+                        <b>Tổng số tài liệu:</b> ${batchData.totalSigned}/${batchData.totalSigned} thành công<br>
+                        <b>Người ký:</b> ${escapeHtml(batchData.signerSubject)}<br>
+                        <b>Thuật toán:</b> ${batchData.algorithm}<br>
+                        <b>Thời gian:</b> ${batchData.signedAt}<br><br>
+                        <b>Danh sách Chữ ký số nhận được:</b>
+                        <div style="max-height: 180px; overflow-y: auto; margin-top: 8px; padding-right: 4px;">
+                            ${listHtml}
+                        </div>
+                    `;
+                } else {
+                    resultBox.className = 'result-box error';
+                    resultBox.innerHTML = `
+                        <b>❌ KÝ BATCH THẤT BẠI - ĐÃ HỦY TOÀN BỘ MẺ KÝ (ROLLBACK):</b><br>
+                        <p style="margin-top: 6px;">${escapeHtml(data.message || 'Lỗi không xác định')}</p>
+                        <p style="margin-top: 6px; font-size: 11px; color: #fca5a5;">(Nguyên tắc Tất cả hoặc Không có gì: Không có chữ ký dở dang nào được trả về hoặc lưu lại)</p>
+                    `;
+                }
+            } catch (err) {
+                resultBox.className = 'result-box error';
+                resultBox.innerHTML = `<b>❌ Lỗi kết nối:</b> ${escapeHtml(err.message)}`;
+            }
         }
 
         // Tự động nạp khi trang mở

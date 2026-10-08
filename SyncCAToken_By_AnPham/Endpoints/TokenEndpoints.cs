@@ -88,6 +88,36 @@ public static class TokenEndpoints
         .WithSummary("Ký chuỗi dữ liệu thô (Data Base64) bằng USB Token")
         .WithTags("Digital Signature");
 
+        // 6. Ký chuỗi băm hàng loạt (Batch Hash) - Chuẩn Tất cả hoặc Không có gì (All-or-Nothing)
+        api.MapPost("/sign/batch-hash", async ([FromBody] SignBatchHashRequest request, ISignatureService signService) =>
+        {
+            var result = await signService.SignBatchHashAtomicAsync(request);
+            if (!result.Success)
+            {
+                return Results.BadRequest(result);
+            }
+
+            return Results.Ok(result);
+        })
+        .WithName("SignBatchHash")
+        .WithSummary("Ký chuỗi băm hàng loạt (Batch Hash) - Nguyên tắc Tất cả hoặc Không có gì (All-or-Nothing)")
+        .WithTags("Digital Signature");
+
+        // 7. Ký dữ liệu thô hàng loạt (Batch Data) - Chuẩn Tất cả hoặc Không có gì (All-or-Nothing)
+        api.MapPost("/sign/batch-data", async ([FromBody] SignBatchDataRequest request, ISignatureService signService) =>
+        {
+            var result = await signService.SignBatchDataAtomicAsync(request);
+            if (!result.Success)
+            {
+                return Results.BadRequest(result);
+            }
+
+            return Results.Ok(result);
+        })
+        .WithName("SignBatchData")
+        .WithSummary("Ký dữ liệu thô hàng loạt (Batch Data) - Nguyên tắc Tất cả hoặc Không có gì (All-or-Nothing)")
+        .WithTags("Digital Signature");
+
         return app;
     }
 }

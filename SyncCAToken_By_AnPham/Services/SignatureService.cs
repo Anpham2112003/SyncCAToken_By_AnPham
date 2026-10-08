@@ -19,6 +19,9 @@ public class SignatureService : ISignatureService
     {
         return await Task.Run(() =>
         {
+            byte[]? hashBytes = null;
+            byte[]? signatureBytes = null;
+
             try
             {
                 if (string.IsNullOrWhiteSpace(request.Thumbprint))
@@ -27,7 +30,6 @@ public class SignatureService : ISignatureService
                 if (string.IsNullOrWhiteSpace(request.HashBase64))
                     return new SignResult { Success = false, Error = "HashBase64 không được để trống." };
 
-                byte[] hashBytes;
                 try
                 {
                     hashBytes = Convert.FromBase64String(request.HashBase64);
@@ -63,8 +65,7 @@ public class SignatureService : ISignatureService
                 using var rsa = cert.GetRSAPrivateKey();
                 if (rsa != null)
                 {
-                    // Lệnh này sẽ kích hoạt popup nhập PIN của Windows/USB Token nếu chưa nhập PIN
-                    byte[] signatureBytes = rsa.SignHash(hashBytes, hashAlgo, RSASignaturePadding.Pkcs1);
+                    signatureBytes = rsa.SignHash(hashBytes, hashAlgo, RSASignaturePadding.Pkcs1);
 
                     return new SignResult
                     {
@@ -81,7 +82,7 @@ public class SignatureService : ISignatureService
                 using var ecdsa = cert.GetECDsaPrivateKey();
                 if (ecdsa != null)
                 {
-                    byte[] signatureBytes = ecdsa.SignHash(hashBytes);
+                    signatureBytes = ecdsa.SignHash(hashBytes);
 
                     return new SignResult
                     {
@@ -118,6 +119,18 @@ public class SignatureService : ISignatureService
                     Error = $"Lỗi khi ký số: {ex.Message}"
                 };
             }
+            finally
+            {
+                // Tiêu hủy byte hash và byte chữ ký nhạy cảm trên RAM
+                if (hashBytes != null)
+                {
+                    CryptographicOperations.ZeroMemory(hashBytes);
+                }
+                if (signatureBytes != null)
+                {
+                    CryptographicOperations.ZeroMemory(signatureBytes);
+                }
+            }
         });
     }
 
@@ -128,27 +141,324 @@ public class SignatureService : ISignatureService
             return new SignResult { Success = false, Error = "DataBase64 không được để trống." };
         }
 
-        byte[] rawBytes;
+        byte[]? rawBytes = null;
+        byte[]? hashBytes = null;
+
         try
         {
-            rawBytes = Convert.FromBase64String(request.DataBase64);
+            try
+            {
+                rawBytes = Convert.FromBase64String(request.DataBase64);
+            }
+            catch (FormatException)
+            {
+                return new SignResult { Success = false, Error = "Dữ liệu DataBase64 không đúng định dạng Base64." };
+            }
+
+            var hashAlgo = ParseHashAlgorithm(request.HashAlgorithm);
+            hashBytes = ComputeHash(rawBytes, hashAlgo);
+
+            var signHashRequest = new SignHashRequest
+            {
+                Thumbprint = request.Thumbprint,
+                HashBase64 = Convert.ToBase64String(hashBytes),
+                HashAlgorithm = request.HashAlgorithm
+            };
+
+            return await SignHashAsync(signHashRequest);
         }
-        catch (FormatException)
+        finally
         {
-            return new SignResult { Success = false, Error = "Dữ liệu DataBase64 không đúng định dạng Base64." };
+            // Tiêu hủy byte thô và byte băm ngay sau khi chuẩn bị xong yêu cầu ký
+            if (rawBytes != null)
+            {
+                CryptographicOperations.ZeroMemory(rawBytes);
+            }
+            if (hashBytes != null)
+            {
+                CryptographicOperations.ZeroMemory(hashBytes);
+            }
+        }
+    }
+
+    public async Task<ApiResponse<BatchSignSuccessData>> SignBatchHashAtomicAsync(SignBatchHashRequest request)
+    {
+        // === GIAI ĐOẠN 1: THẨM ĐỊNH (PRE-VALIDATION) NGOẠI TUYẾN ===
+        if (string.IsNullOrWhiteSpace(request.Thumbprint))
+        {
+            return ApiResponse<BatchSignSuccessData>.Fail("Thumbprint không được để trống.");
+        }
+
+        if (request.Items == null || request.Items.Count == 0)
+        {
+            return ApiResponse<BatchSignSuccessData>.Fail("Danh sách tài liệu cần ký không được để trống.");
+        }
+
+        var duplicateIds = request.Items
+            .GroupBy(x => x.Id)
+            .Where(g => g.Count() > 1)
+            .Select(g => g.Key)
+            .ToList();
+
+        if (duplicateIds.Count > 0)
+        {
+            return ApiResponse<BatchSignSuccessData>.Fail($"Phát hiện trùng lặp Id tài liệu trong mẻ ký: {string.Join(", ", duplicateIds)}.");
         }
 
         var hashAlgo = ParseHashAlgorithm(request.HashAlgorithm);
-        byte[] hashBytes = ComputeHash(rawBytes, hashAlgo);
+        var validatedHashes = new List<(string Id, byte[] HashBytes)>(request.Items.Count);
 
-        var signHashRequest = new SignHashRequest
+        try
         {
-            Thumbprint = request.Thumbprint,
-            HashBase64 = Convert.ToBase64String(hashBytes),
-            HashAlgorithm = request.HashAlgorithm
-        };
+            foreach (var item in request.Items)
+            {
+                if (string.IsNullOrWhiteSpace(item.Id))
+                {
+                    return ApiResponse<BatchSignSuccessData>.Fail("Có tài liệu trong danh sách bị thiếu Id định danh.");
+                }
 
-        return await SignHashAsync(signHashRequest);
+                if (string.IsNullOrWhiteSpace(item.HashBase64))
+                {
+                    return ApiResponse<BatchSignSuccessData>.Fail($"Tài liệu '{item.Id}' bị thiếu dữ liệu băm HashBase64.");
+                }
+
+                byte[] rawHash;
+                try
+                {
+                    rawHash = Convert.FromBase64String(item.HashBase64);
+                }
+                catch (FormatException)
+                {
+                    return ApiResponse<BatchSignSuccessData>.Fail($"Tài liệu '{item.Id}' có HashBase64 không đúng định dạng Base64.");
+                }
+
+                try
+                {
+                    ValidateHashLength(rawHash, hashAlgo);
+                }
+                catch (ArgumentException ex)
+                {
+                    CryptographicOperations.ZeroMemory(rawHash);
+                    return ApiResponse<BatchSignSuccessData>.Fail($"Tài liệu '{item.Id}': {ex.Message}");
+                }
+
+                validatedHashes.Add((item.Id, rawHash));
+            }
+
+            // === GIAI ĐOẠN 2: THỰC THI NGUYÊN TỬ (ATOMIC SIGNING) ===
+            var response = await Task.Run(() =>
+            {
+                using var cert = _certificateService.FindCertificate(request.Thumbprint);
+                if (cert == null)
+                {
+                    return ApiResponse<BatchSignSuccessData>.Fail($"Không tìm thấy chứng thư số với Thumbprint '{request.Thumbprint}' trong Windows Store.");
+                }
+
+                if (!cert.HasPrivateKey)
+                {
+                    return ApiResponse<BatchSignSuccessData>.Fail("Chứng thư số này không có Private Key để thực hiện ký số.");
+                }
+
+                using var rsa = cert.GetRSAPrivateKey();
+                using var ecdsa = cert.GetECDsaPrivateKey();
+
+                if (rsa == null && ecdsa == null)
+                {
+                    return ApiResponse<BatchSignSuccessData>.Fail("Không thể truy xuất Private Key (RSA/ECDSA) từ thiết bị USB Token.");
+                }
+
+                var signatureBuffer = new List<BatchItemSignature>(validatedHashes.Count);
+
+                try
+                {
+                    // Duyệt tuần tự qua cùng 1 crypto session để chỉ nhập PIN 1 lần
+                    for (int i = 0; i < validatedHashes.Count; i++)
+                    {
+                        var (id, hashBytes) = validatedHashes[i];
+                        byte[]? sigBytes = null;
+
+                        try
+                        {
+                            if (rsa != null)
+                            {
+                                sigBytes = rsa.SignHash(hashBytes, hashAlgo, RSASignaturePadding.Pkcs1);
+                            }
+                            else
+                            {
+                                sigBytes = ecdsa!.SignHash(hashBytes);
+                            }
+
+                            signatureBuffer.Add(new BatchItemSignature
+                            {
+                                Id = id,
+                                SignatureBase64 = Convert.ToBase64String(sigBytes)
+                            });
+                        }
+                        catch (CryptographicException ex)
+                        {
+                            _logger.LogError(ex, "Lỗi mã hóa tại tài liệu {Id} trong mẻ ký batch", id);
+                            signatureBuffer.Clear(); // Hủy bỏ toàn bộ buffer chữ ký
+
+                            string errorDetail = MapCryptographicError(ex);
+                            return ApiResponse<BatchSignSuccessData>.Fail(
+                                $"Ký batch thất bại tại tài liệu '{id}': {errorDetail}. Toàn bộ mẻ ký đã bị hủy bỏ."
+                            );
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Lỗi không xác định tại tài liệu {Id} trong mẻ ký batch", id);
+                            signatureBuffer.Clear(); // Hủy bỏ toàn bộ buffer chữ ký
+
+                            return ApiResponse<BatchSignSuccessData>.Fail(
+                                $"Ký batch thất bại tại tài liệu '{id}': {ex.Message}. Toàn bộ mẻ ký đã bị hủy bỏ."
+                            );
+                        }
+                        finally
+                        {
+                            // Tiêu hủy byte chữ ký nhị phân trên RAM ngay sau khi đã encode sang Base64
+                            if (sigBytes != null)
+                            {
+                                CryptographicOperations.ZeroMemory(sigBytes);
+                            }
+                        }
+                    }
+
+                    // === GIAI ĐOẠN 3: HOÀN TẤT KHI 100% THÀNH CÔNG ===
+                    var successData = new BatchSignSuccessData
+                    {
+                        TotalSigned = signatureBuffer.Count,
+                        Thumbprint = cert.Thumbprint ?? request.Thumbprint,
+                        SignerSubject = cert.Subject,
+                        Algorithm = rsa != null ? $"{hashAlgo.Name}withRSA" : $"{hashAlgo.Name}withECDSA",
+                        SignedAt = DateTime.UtcNow,
+                        Signatures = signatureBuffer
+                    };
+
+                    return ApiResponse<BatchSignSuccessData>.Ok(
+                        successData,
+                        $"Ký batch thành công toàn bộ {successData.TotalSigned}/{successData.TotalSigned} tài liệu."
+                    );
+                }
+                finally
+                {
+                    // Nếu không đạt 100% thành công, xóa sạch bộ đệm
+                    if (signatureBuffer.Count < validatedHashes.Count)
+                    {
+                        signatureBuffer.Clear();
+                    }
+                }
+            });
+
+            return response;
+        }
+        finally
+        {
+            // BẢO MẬT & DỌN DẸP RAM: Tiêu hủy toàn bộ byte hash trong bộ nhớ
+            foreach (var item in validatedHashes)
+            {
+                if (item.HashBytes != null)
+                {
+                    CryptographicOperations.ZeroMemory(item.HashBytes);
+                }
+            }
+            validatedHashes.Clear();
+
+            // Nếu mẻ ký có từ 5 item trở lên, kích hoạt thu hồi bộ nhớ tối ưu cho ứng dụng Tray ngầm
+            if (request.Items.Count >= 5)
+            {
+                GC.Collect(2, GCCollectionMode.Optimized, blocking: false);
+            }
+        }
+    }
+
+    public async Task<ApiResponse<BatchSignSuccessData>> SignBatchDataAtomicAsync(SignBatchDataRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Thumbprint))
+        {
+            return ApiResponse<BatchSignSuccessData>.Fail("Thumbprint không được để trống.");
+        }
+
+        if (request.Items == null || request.Items.Count == 0)
+        {
+            return ApiResponse<BatchSignSuccessData>.Fail("Danh sách tài liệu cần ký không được để trống.");
+        }
+
+        var duplicateIds = request.Items
+            .GroupBy(x => x.Id)
+            .Where(g => g.Count() > 1)
+            .Select(g => g.Key)
+            .ToList();
+
+        if (duplicateIds.Count > 0)
+        {
+            return ApiResponse<BatchSignSuccessData>.Fail($"Phát hiện trùng lặp Id tài liệu trong mẻ ký: {string.Join(", ", duplicateIds)}.");
+        }
+
+        var hashAlgo = ParseHashAlgorithm(request.HashAlgorithm);
+        var hashItems = new List<BatchHashItem>(request.Items.Count);
+
+        try
+        {
+            foreach (var item in request.Items)
+            {
+                if (string.IsNullOrWhiteSpace(item.Id))
+                {
+                    return ApiResponse<BatchSignSuccessData>.Fail("Có tài liệu trong danh sách bị thiếu Id định danh.");
+                }
+
+                if (string.IsNullOrWhiteSpace(item.DataBase64))
+                {
+                    return ApiResponse<BatchSignSuccessData>.Fail($"Tài liệu '{item.Id}' bị thiếu dữ liệu DataBase64.");
+                }
+
+                byte[]? rawBytes = null;
+                byte[]? hashBytes = null;
+
+                try
+                {
+                    try
+                    {
+                        rawBytes = Convert.FromBase64String(item.DataBase64);
+                    }
+                    catch (FormatException)
+                    {
+                        return ApiResponse<BatchSignSuccessData>.Fail($"Tài liệu '{item.Id}' có DataBase64 không đúng định dạng Base64.");
+                    }
+
+                    hashBytes = ComputeHash(rawBytes, hashAlgo);
+                    hashItems.Add(new BatchHashItem
+                    {
+                        Id = item.Id,
+                        HashBase64 = Convert.ToBase64String(hashBytes)
+                    });
+                }
+                finally
+                {
+                    // Tiêu hủy byte thô và byte hash trung gian ngay sau khi tính toán
+                    if (rawBytes != null)
+                    {
+                        CryptographicOperations.ZeroMemory(rawBytes);
+                    }
+                    if (hashBytes != null)
+                    {
+                        CryptographicOperations.ZeroMemory(hashBytes);
+                    }
+                }
+            }
+
+            var batchHashRequest = new SignBatchHashRequest
+            {
+                Thumbprint = request.Thumbprint,
+                HashAlgorithm = request.HashAlgorithm,
+                Items = hashItems
+            };
+
+            return await SignBatchHashAtomicAsync(batchHashRequest);
+        }
+        finally
+        {
+            hashItems.Clear();
+        }
     }
 
     private static HashAlgorithmName ParseHashAlgorithm(string? algorithm)

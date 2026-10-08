@@ -145,6 +145,80 @@ Invoke-RestMethod @invokeParams
 
 Lỗi nhập liệu hoặc lỗi ký thường trả HTTP 400 với **success: false** và lý do trong **message**. Ví dụ: Base64 sai định dạng, hash sai độ dài, không tìm thấy chứng thư, chứng thư không có private key, Token chưa sẵn sàng, PIN sai hoặc thao tác PIN bị hủy.
 
+### POST /api/sign/batch-hash
+
+Ký chuỗi băm hàng loạt với nguyên tắc **Tất cả hoặc Không có gì (All-or-Nothing)**:
+- **Chỉ nhập PIN 1 lần**: Giữ crypto context trong suốt mẻ ký.
+- **Thẩm định trước (Pre-validation)**: Kiểm tra định dạng Base64, độ dài hash và tính duy nhất của `id` trong RAM trước khi chạm vào Token; nếu có lỗi ở bất kỳ item nào, adapter từ chối ngay mà không hiện popup PIN.
+- **Nguyên tử (Atomic Rollback)**: Nếu xảy ra bất kỳ lỗi nào trong quá trình ký (người dùng hủy PIN, sai PIN, rút token), adapter lập tức **hủy toàn bộ chữ ký đã tạo**, dừng khẩn cấp và trả HTTP 400 (không trả về chữ ký dở dang).
+
+Body mẫu:
+
+~~~json
+{
+  "thumbprint": "<THUMBPRINT>",
+  "hashAlgorithm": "SHA256",
+  "items": [
+    {
+      "id": "INV-001",
+      "hashBase64": "<BASE64_HASH_1>"
+    },
+    {
+      "id": "INV-002",
+      "hashBase64": "<BASE64_HASH_2>"
+    }
+  ]
+}
+~~~
+
+Response thành công (HTTP 200) - chỉ trả về khi 100% item thành công:
+
+~~~json
+{
+  "success": true,
+  "message": "Ký batch thành công toàn bộ 2/2 tài liệu.",
+  "data": {
+    "totalSigned": 2,
+    "thumbprint": "<THUMBPRINT>",
+    "signerSubject": "<SUBJECT>",
+    "algorithm": "SHA256withRSA",
+    "signedAt": "2026-10-05T02:30:00Z",
+    "signatures": [
+      {
+        "id": "INV-001",
+        "signatureBase64": "<BASE64_CHU_KY_1>"
+      },
+      {
+        "id": "INV-002",
+        "signatureBase64": "<BASE64_CHU_KY_2>"
+      }
+    ]
+  },
+  "timestamp": "2026-10-05T02:30:00Z"
+}
+~~~
+
+### POST /api/sign/batch-data
+
+Ký dữ liệu thô hàng loạt với cùng nguyên tắc **All-or-Nothing**. Adapter tự tính hash cho từng item trong bộ nhớ trước, thẩm định toàn bộ rồi ký tuần tự qua 1 phiên Token:
+
+~~~json
+{
+  "thumbprint": "<THUMBPRINT>",
+  "hashAlgorithm": "SHA256",
+  "items": [
+    {
+      "id": "DOC-001",
+      "dataBase64": "<BASE64_RAW_DATA_1>"
+    },
+    {
+      "id": "DOC-002",
+      "dataBase64": "<BASE64_RAW_DATA_2>"
+    }
+  ]
+}
+~~~
+
 ## Luồng ký PDF hai pha của SmartLab
 
 1. Client gọi **GET /api/certificates?validOnly=true&hardwareOnly=true** để chọn chứng thư còn hạn có private key.

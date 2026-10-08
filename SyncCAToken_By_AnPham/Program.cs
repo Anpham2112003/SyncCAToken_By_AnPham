@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using SyncCAToken_By_AnPham.Endpoints;
 using SyncCAToken_By_AnPham.Services;
 
@@ -97,7 +97,9 @@ app.MapGet("/", () => Results.Ok(new
         "GET /api/certificates",
         "GET /api/certificates/{thumbprint}",
         "POST /api/sign/hash",
-        "POST /api/sign/data"
+        "POST /api/sign/data",
+        "POST /api/sign/batch-hash",
+        "POST /api/sign/batch-data"
     }
 }))
 .WithName("RootInfo")
